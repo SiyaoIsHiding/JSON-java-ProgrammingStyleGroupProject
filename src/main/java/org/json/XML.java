@@ -439,7 +439,7 @@ public class XML {
 
     // Jane
 
-    public static boolean parseWithPath(XMLTokener x, JSONObject context, String name, XMLParserConfiguration config, List<String> currPath, List<String> targetPath, JSONObject to)
+    public static boolean parseWithPath(XMLTokener x, JSONObject context, String name, XMLParserConfiguration config, List<String> currPath, List<String> targetPath, JSONObject toReplace)
             throws JSONException {
         char c;
         int i;
@@ -478,7 +478,11 @@ public class XML {
                         string = x.nextCDATA();
                         if (string.length() > 0) {
                             currPath.add(config.getcDataTagName());
-                            context.accumulate(config.getcDataTagName(), string);
+                            if (isTwoPathSame(currPath,targetPath)){
+                                jsonObject.put(string, toReplace);
+                            }else{
+                                context.accumulate(config.getcDataTagName(), string);
+                            }
                             currPath.remove(currPath.size()-1);
                         }
                         return false;
@@ -526,11 +530,18 @@ public class XML {
 
         } else {
             tagName = (String) token;
-
             token = null;
             jsonObject = new JSONObject();
             boolean nilAttributeFound = false;
             xmlXsiTypeConverter = null;
+            currPath.add(tagName);
+            if (isTwoPathSame(currPath, targetPath)){
+                context.put(tagName, toReplace);
+                x.skipPast("</" + tagName + ">");
+                currPath.remove(currPath.size()-1);
+                return false;
+            }
+
             for (;;) {
                 if (token == null) {
                     token = x.nextToken();
@@ -539,8 +550,9 @@ public class XML {
                 if (token instanceof String) {
                     string = (String) token;
                     token = x.nextToken();
-                    currPath.add(tagName);
+
                     if (token == EQ) {
+
                         token = x.nextToken();
                         if (!(token instanceof String)) {
                             throw x.syntaxError("Missing value");
@@ -554,24 +566,29 @@ public class XML {
                                 && TYPE_ATTR.equals(string)) {
                             xmlXsiTypeConverter = config.getXsiTypeMap().get(token);
                         } else if (!nilAttributeFound) {
-                            if (isTwoPathSame(currPath,targetPath)){
-                                System.out.println("Target found");
-                            }
                             currPath.add(string);
-                            jsonObject.accumulate(string,
-                                    config.isKeepStrings()
-                                            ? ((String) token)
-                                            : stringToValue((String) token));
+                            if (isTwoPathSame(currPath,targetPath)){
+                                jsonObject.put(string, toReplace);
+                            }else{
+                                jsonObject.accumulate(string,
+                                        config.isKeepStrings()
+                                                ? ((String) token)
+                                                : stringToValue((String) token));
+                            }
                             currPath.remove(currPath.size()-1);
                         }
                         token = null;
                     } else {
                         currPath.add(string);
-                        jsonObject.accumulate(string, "");
+                        if (isTwoPathSame(currPath,targetPath)){
+                            jsonObject.accumulate(string, toReplace);
+                        }else{
+                            jsonObject.accumulate(string, "");
+                        }
                         currPath.remove(currPath.size()-1);
                     }
 
-                    currPath.remove(currPath.size()-1);
+//                    currPath.remove(currPath.size()-1);
 
                 } else if (token == SLASH) {
                     // Empty tag <.../>
@@ -580,24 +597,31 @@ public class XML {
                     }
                     if (config.getForceList().contains(tagName)) {
                         // Force the value to be an array
-                        if (nilAttributeFound) {
+//                        currPath.add(tagName);
+                        if (isTwoPathSame(currPath,targetPath)){
+                            context.put(tagName, toReplace);
+                        }else if (nilAttributeFound) {
                             context.append(tagName, JSONObject.NULL);
                         } else if (jsonObject.length() > 0) {
                             context.append(tagName, jsonObject);
                         } else {
                             context.put(tagName, new JSONArray());
                         }
+//                        currPath.remove(currPath.size()-1);
                     } else {
-                        currPath.add(tagName);
-                        if (nilAttributeFound) {
+//                        currPath.add(tagName);
+                        if (isTwoPathSame(currPath,targetPath)){
+                            context.put(tagName, toReplace);
+                        }else if (nilAttributeFound) {
                             context.accumulate(tagName, JSONObject.NULL);
                         } else if (jsonObject.length() > 0) {
                             context.accumulate(tagName, jsonObject);
                         } else {
                             context.accumulate(tagName, "");
                         }
-                        currPath.remove(currPath.size()-1);
+//                        currPath.remove(currPath.size()-1);
                     }
+                    currPath.remove(currPath.size()-1);
                     return false;
 
                 } else if (token == GT) {
@@ -612,7 +636,13 @@ public class XML {
                         } else if (token instanceof String) {
                             string = (String) token;
                             if (string.length() > 0) {
-                                currPath.add(config.getcDataTagName());
+//                                currPath.add(tagName);
+                                // should not replace here
+//                                if(isTwoPathSame(currPath, targetPath)){
+//                                    context.put(tagName, toReplace);
+//                                    x.skipPast("</"+tagName+">");
+//                                    return false;
+//                                }
                                 if(xmlXsiTypeConverter != null) {
                                     jsonObject.accumulate(config.getcDataTagName(),
                                             stringToValue(string, xmlXsiTypeConverter));
@@ -620,13 +650,13 @@ public class XML {
                                     jsonObject.accumulate(config.getcDataTagName(),
                                             config.isKeepStrings() ? string : stringToValue(string));
                                 }
-                                currPath.remove(currPath.size()-1);
+//                                currPath.remove(currPath.size()-1);
                             }
 
                         } else if (token == LT) {
                             // Nested element
-                            currPath.add(tagName);
-                            if (parseWithPath(x, jsonObject, tagName, config, currPath, targetPath, to)) {
+//                            currPath.add(tagName);
+                            if (parseWithPath(x, jsonObject, tagName, config, currPath, targetPath, toReplace)) {
                                 if (config.getForceList().contains(tagName)) {
                                     // Force the value to be an array
 
@@ -638,10 +668,7 @@ public class XML {
                                     } else {
                                         context.append(tagName, jsonObject);
                                     }
-                                    System.out.println(currPath.toString() + jsonObject.toString());
-//                                    currPath.remove(currPath.size()-1);
                                 } else {
-//                                    currPath.add(tagName);
                                     if (jsonObject.length() == 0) {
                                         context.accumulate(tagName, "");
                                     } else if (jsonObject.length() == 1
@@ -650,13 +677,9 @@ public class XML {
                                     } else {
                                         context.accumulate(tagName, jsonObject);
                                     }
-                                    System.out.println(currPath.toString() + jsonObject.toString());
-//                                    currPath.remove(currPath.size()-1);
                                 }
                                 currPath.remove(currPath.size()-1);
                                 return false;
-                            }else{
-                                currPath.remove(currPath.size()-1);
                             }
 
                         }
