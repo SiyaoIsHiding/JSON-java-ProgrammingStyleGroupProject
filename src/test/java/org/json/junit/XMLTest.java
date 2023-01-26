@@ -303,18 +303,18 @@ public class XMLTest {
 
         String expectedStr =
                 "{\"addresses\":{\"address\":{\"street\":\"[CDATA[Baker street 5]\","+
-                        "\"name\":\"Joe Tester\",\"NothingHere\":\"\",TrueValue:true,\n"+
+                        "\"name\":\"Joe Tester\",\"NothingHere\":\"\",TrueValue:{},\n"+
                         "\"FalseValue\":false,\"NullValue\":null,\"PositiveValue\":42,\n"+
                         "\"NegativeValue\":-23,\"DoubleValue\":-23.45,\"Nan\":-23x.45,\n"+
                         "\"ArrayOfNum\":\"1, 2, 3, 4.1, 5.2\"\n"+
                         "},\"xsi:noNamespaceSchemaLocation\":"+
                         "\"test.xsd\",\"xmlns:xsi\":\"http://www.w3.org/2001/"+
                         "XMLSchema-instance\"}}";
-
         JSONObject expectedJsonObject = new JSONObject(expectedStr);
         Reader reader = new StringReader(xmlStr);
         JSONPointer pointer = new JSONPointer("/addresses/address/TrueValue");
-        JSONObject jsonObject = XML.toJSONObject(reader, pointer, new JSONObject());
+        JSONObject actualJsonObject = XML.toJSONObject(reader, pointer, new JSONObject());
+        Util.compareActualVsExpectedJsonObjects(actualJsonObject,expectedJsonObject);
     }
 
 
